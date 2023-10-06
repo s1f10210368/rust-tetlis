@@ -36,7 +36,7 @@ fn main() {
                     x: game.pos.x,
                     y: game.pos.y+1,
                 };
-                if !is_collision(&game.field, &new_pos, game.block){
+                if !is_collision(&game.field, &new_pos, &game.block){
                     // posの座標を更新
                     game.pos = new_pos; // 更新する際にアクセスしたいためポイント演算子を追加
                 } else {
@@ -45,10 +45,12 @@ fn main() {
 
                     // ラインの削除処理
                     erase_line(&mut game.field);
-                    // posの座標を初期値に
-                    game.pos = Position {x: 4, y: 0 };
-                    // ブロックをランダムで生成
-                    game.block = rand::random();
+                    // ブロックの生成
+                    if spawn_block(&mut game).is_err() {
+                        // ブロックを生成できないならゲームオーバー
+                        gameover(&game);
+                        break;
+                    }
                 }
                 //フィールドを更新
                 draw(&game);
@@ -64,7 +66,7 @@ fn main() {
             Ok(Key::Left) => {
                 let mut game = game.lock().unwrap();
                 let new_pos = Position {
-                    x: game.pos.x.checked_sub(1).unwrap_or_else(|| game.pos.x),
+                    x: game.pos.x.checked_sub(1).unwrap_or(game.pos.x),
                     y: game.pos.y,
                 };
                 move_block(&mut game, new_pos);
@@ -88,12 +90,25 @@ fn main() {
                 move_block(&mut game, new_pos);
                 draw(&game);
             }
+            Ok(Key::Char('a')) => {
+                // 左回転
+                let mut game = game.lock().unwrap();
+                rotate_left(&mut game);
+                draw(&game);
+            }
+            Ok(Key::Char('d')) => {
+                // 右回転
+                let mut game = game.lock().unwrap();
+                rotate_right(&mut game);
+                draw(&game);
+            }
             Ok(Key::Char('q')) => {
-                // カーソルの再表示
-                println!("\x1b[?25h");
-                return;
+                break;
             }
             _ => (),
         }
     }
+
+    // 終了処理
+    quit();
 }

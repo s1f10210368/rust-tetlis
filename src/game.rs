@@ -106,7 +106,7 @@ pub fn fix_block(Game { field, pos, block }: &mut Game) {
     for y in 0..4 {
         for x in 0..4 {
             if block[y][x] != block_kind::NONE {
-                field[y+pos.y][x+pos.x] = 1;
+                field[y+pos.y][x+pos.x] = block[y][x];
             }
         }
     }

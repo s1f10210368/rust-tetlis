@@ -12,7 +12,7 @@ pub type Field = [[BlockColor; FIELD_WIDTH]; FIELD_HEIGHT];
 // usize型は組み込み整数型の1つであり、ここでは座標を表すために定義。usizeは非負整数を表すのに適している
 pub struct Position {
     pub x: usize,
-    pub y: usize,
+    pub y: usize, //ここで位置を定義、他の関数内でこれを用いて編集
 }
 
 impl Position {

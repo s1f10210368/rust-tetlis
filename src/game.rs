@@ -1,19 +1,17 @@
-#![allow(clippy::needless_range_loop)]
 use crate::block::{BlockKind, BlockShape, BLOCKS};
 use crate::block::{BlockColor, block_kind, COLOR_TABLE,
     block_kind::WALL as W,
 };
 
-// フィールドサイズの定義
-pub const FIELD_WIDTH:  usize = 11 + 2 + 2;  // フィールド＋壁
-pub const FIELD_HEIGHT: usize = 20 + 1 + 1;  // フィールド＋底
+// フィールドサイズ
+pub const FIELD_WIDTH:  usize = 11 + 2 + 2;  // フィールド＋壁＋番兵
+pub const FIELD_HEIGHT: usize = 20 + 1 + 1;  // フィールド＋底＋番兵
 pub type Field = [[BlockColor; FIELD_WIDTH]; FIELD_HEIGHT];
 
-// usize型は組み込み整数型の1つであり、ここでは座標を表すために定義。usizeは非負整数を表すのに適している
 #[derive(Clone, Copy)]
 pub struct Position {
     pub x: usize,
-    pub y: usize, //ここで位置を定義、他の関数内でこれを用いて編集
+    pub y: usize,
 }
 
 impl Position {
@@ -64,11 +62,27 @@ impl Game {
     }
 }
 
-pub fn draw(Game { field, pos, block }: &Game) {
-    // 描画する用のフィールド生成
-    let mut field_buf = *field;
+// ゴーストの座標を返す
+fn ghost_pos(field: &Field, pos: &Position, block: &BlockShape) -> Position {
+    let mut ghost_pos = *pos;
+    while {
+        let new_pos = Position {
+            x: ghost_pos.x,
+            y: ghost_pos.y + 1,
+        };
+        !is_collision(field, &new_pos, block)
+    }{
+        ghost_pos.y += 1;
+    }
+    ghost_pos
+}
 
-    // 描画ようフィールドにゴーストを書き込む
+// フィールドを描画する
+#[allow(clippy::needless_range_loop)]
+pub fn draw(Game { field, pos, block }: &Game) {
+    // 描画用フィールドの生成
+    let mut field_buf = *field;
+    // 描画用フィールドにゴーストブロックを書き込む
     let ghost_pos = ghost_pos(field, pos, block);
     for y in 0..4 {
         for x in 0..4 {
@@ -77,8 +91,7 @@ pub fn draw(Game { field, pos, block }: &Game) {
             }
         }
     }
-
-    // 生成したフィールドにブロックの情報を書き込む
+    // 描画用フィールドにブロックの情報を書き込む
     for y in 0..4 {
         for x in 0..4 {
             if block[y][x] != block_kind::NONE {
@@ -87,9 +100,9 @@ pub fn draw(Game { field, pos, block }: &Game) {
         }
     }
     // フィールドを描画
-    println!("\x1b[H"); // カーソルを先頭に移動
+    println!("\x1b[H");  // カーソルを先頭に移動
     for y in 0..FIELD_HEIGHT-1 {
-        for x in 0..FIELD_WIDTH-1 {
+        for x in 1..FIELD_WIDTH-1 {
             print!("{}", COLOR_TABLE[field_buf[y][x]]);
         }
         println!();
@@ -97,14 +110,14 @@ pub fn draw(Game { field, pos, block }: &Game) {
 }
 
 // ブロックがフィールドに衝突する場合は`true`を返す
-pub fn is_collision(field: &Field, pos: &Position, block: &BlockShape) -> bool { // &をつけると共有参照といい実引数の値を不変参照している
+pub fn is_collision(field: &Field, pos: &Position, block: &BlockShape) -> bool {
     for y in 0..4 {
         for x in 0..4 {
             if y+pos.y >= FIELD_HEIGHT || x+pos.x >= FIELD_WIDTH {
                 continue;
             }
             if block[y][x] != block_kind::NONE && field[y+pos.y][x+pos.x] != block_kind::NONE {
-                // ブロックとフィールドのどちらも何かしらのブロックがある場合は衝突
+                // ブロックとフィールドのどちらも何かしらのブロックがある場合は衝突している
                 return true;
             }
         }
@@ -127,7 +140,7 @@ pub fn fix_block(Game { field, pos, block }: &mut Game) {
 pub fn erase_line(field: &mut Field) {
     for y in 1..FIELD_HEIGHT-2 {
         let mut can_erase = true;
-        for x in 1..FIELD_WIDTH-2 {
+        for x in 2..FIELD_WIDTH-2 {
             if field[y][x] == 0 {
                 can_erase = false;
                 break;
@@ -149,113 +162,8 @@ pub fn move_block(game: &mut Game, new_pos: Position) {
     }
 }
 
-// ブロックを生成
-// 生成に失敗した場合にErr(())を返すようにする
-
-pub fn spawn_block(game: &mut Game) -> Result<(), ()> {
-    // posの座標を初期値に設定
-    game.pos = Position::init();
-    // ブロックをランダム生成
-    game.block = BLOCKS[rand::random::<BlockKind>() as usize];
-
-    // 衝突確認
-    if is_collision(&game.field, &game.pos, &game.block) {
-        Err(())
-    } else {
-        Ok(())
-    }
-}
-
-// ゲームオーバーの処理を追加
-pub fn gameover(game: &Game) {
-    draw(game);
-    println!("GAMEOVER");
-    println!("press 'q' key to exit");
-}
-
-// 終了処理
-pub fn quit() {
-    // カーソル再表示
-    println!("\x1b[?25h");
-}
-
-// 右に90度回転する処理の追加
-#[allow(clippy::needless_range_loop)]
-pub fn rotate_right(game: &mut Game) {
-    let mut new_shape: BlockShape = Default::default();
-    for y in 0..4 {
-        for x in 0..4 {
-            new_shape[y][x] = game.block[4-1-x][y];
-        }
-    }
-    if !is_collision(&game.field, &game.pos, &new_shape) {
-        game.block = new_shape;
-    } else if let Ok(new_pos) = super_rotation(&game.field, &game.pos, &new_shape) {
-        game.pos  = new_pos;
-        game.block = new_shape;
-    }
-}
-
-// 左に90度回転する処理を追加
-#[allow(clippy::needless_range_loop)]
-pub fn rotate_left(game: &mut Game) {
-    let mut new_shape: BlockShape = Default::default();
-    for y in 0..4 {
-        for x in 0..4 {
-            new_shape[4-1-x][y] = game.block[y][x];
-        }
-    }
-    if !is_collision(&game.field, &game.pos, &new_shape) {
-        game.block = new_shape;
-    } else if let Ok(new_pos) = super_rotation(&game.field, &game.pos, &new_shape){
-        game.pos = new_pos;
-        game.block = new_shape;
-    }
-}
-
- // ハードドロップする
-pub fn hard_drop(game: &mut Game) {
-    while {
-        let new_pos = Position {
-            x: game.pos.x,
-            y: game.pos.y + 1,
-        };
-        !is_collision(&game.field, &new_pos, &game.block)
-    }{
-        game.pos.y += 1;
-    }
-    let new_pos = game.pos;
-    move_block(game, new_pos);
-}
-
- // ブロック落下後の処理
-pub fn landing(game: &mut Game) -> Result<(), ()> {
-    // ブロックをフィールドに固定
-    fix_block(game);
-    // ラインの削除処理
-    erase_line(&mut game.field);
-    // ブロックの生成
-    spawn_block(game)?;
-    Ok(())
-}
-
- // ゴーストの座標を返す
-fn ghost_pos(field: &Field, pos: &Position, block: &BlockShape) -> Position {
-    let mut ghost_pos = *pos;
-    while {
-        let new_pos = Position {
-            x: ghost_pos.x,
-            y: ghost_pos.y + 1,
-        };
-        !is_collision(field, &new_pos, block)
-    }{
-        ghost_pos.y += 1;
-    }
-    ghost_pos
-}
-
- // スーパーローテーション処理
- // スーパーローテーションできるなら、その座標を返す
+// スーパーローテーション処理
+// スーパーローテーションできるなら、その座標を返す
 fn super_rotation(field: &Field, pos: &Position, block: &BlockShape) -> Result<Position, ()> {
     // 1マスずらした座標
     let diff_pos = [
@@ -286,4 +194,92 @@ fn super_rotation(field: &Field, pos: &Position, block: &BlockShape) -> Result<P
         }
     }
     Err(())
+}
+
+// 左に90度回転する
+#[allow(clippy::needless_range_loop)]
+pub fn rotate_left(game: &mut Game) {
+    let mut new_shape: BlockShape = Default::default();
+    for y in 0..4 {
+        for x in 0..4 {
+            new_shape[4-1-x][y] = game.block[y][x];
+        }
+    }
+    if !is_collision(&game.field, &game.pos, &new_shape) {
+        game.block = new_shape;
+    } else if let Ok(new_pos) = super_rotation(&game.field, &game.pos, &new_shape) {
+        game.pos  = new_pos;
+        game.block = new_shape;
+    }
+}
+
+// 右に90度回転する
+#[allow(clippy::needless_range_loop)]
+pub fn rotate_right(game: &mut Game) {
+    let mut new_shape: BlockShape = Default::default();
+    for y in 0..4 {
+        for x in 0..4 {
+            new_shape[y][x] = game.block[4-1-x][y];
+        }
+    }
+    if !is_collision(&game.field, &game.pos, &new_shape) {
+        game.block = new_shape;
+    } else if let Ok(new_pos) = super_rotation(&game.field, &game.pos, &new_shape) {
+        game.pos  = new_pos;
+        game.block = new_shape;
+    }
+}
+
+// ハードドロップする
+pub fn hard_drop(game: &mut Game) {
+    while {
+        let new_pos = Position {
+            x: game.pos.x,
+            y: game.pos.y + 1,
+        };
+        !is_collision(&game.field, &new_pos, &game.block)
+    }{
+        game.pos.y += 1;
+    }
+    let new_pos = game.pos;
+    move_block(game, new_pos);
+}
+
+// ブロック落下後の処理
+pub fn landing(game: &mut Game) -> Result<(), ()> {
+    // ブロックをフィールドに固定
+    fix_block(game);
+    // ラインの削除処理
+    erase_line(&mut game.field);
+    // ブロックの生成
+    spawn_block(game)?;
+    Ok(())
+}
+
+// ブロックを生成する
+// 生成に失敗した場合は`Err(())`を返す
+pub fn spawn_block(game: &mut Game) -> Result<(), ()> {
+    // posの座標を初期値へ
+    game.pos = Position::init();
+    // ブロックをランダム生成
+    game.block = BLOCKS[rand::random::<BlockKind>() as usize];
+    // 衝突チェック
+    if is_collision(&game.field, &game.pos, &game.block) {
+        Err(())
+    } else {
+        Ok(())
+    }
+}
+
+// ゲームオーバー処理
+pub fn gameover(game: &Game) {
+    draw(game);
+    println!("GAMEOVER");
+    println!("press `q` key to exit");
+}
+
+// 終了処理
+pub fn quit() {
+    // カーソルを再表示
+    println!("\x1b[?25h");
 }

@@ -40,13 +40,7 @@ fn main() {
                     // posの座標を更新
                     game.pos = new_pos; // 更新する際にアクセスしたいためポイント演算子を追加
                 } else {
-                    // ブロックをフィールド上で固定する処理
-                    fix_block(&mut game);
-
-                    // ラインの削除処理
-                    erase_line(&mut game.field);
-                    // ブロックの生成
-                    if spawn_block(&mut game).is_err() {
+                    if landing(&mut game).is_err(){
                         // ブロックを生成できないならゲームオーバー
                         gameover(&game);
                         break;
@@ -104,6 +98,17 @@ fn main() {
             }
             Ok(Key::Char('q')) => {
                 break;
+            }
+            Ok(Key::Up) => {
+                // ハードドロップ
+                let mut game = game.lock().unwrap();
+                hard_drop(&mut game);
+                if landing(&mut game).is_err() {
+                    // ブロックを生成できないならゲームオーバー
+                    gameover(&game);
+                    break;
+                }
+                draw(&game);
             }
             _ => (),
         }

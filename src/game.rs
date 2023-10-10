@@ -1,4 +1,4 @@
-#[allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_range_loop)]
 use crate::block::{BlockKind, BlockShape, BLOCKS};
 use crate::block::{BlockColor, block_kind, COLOR_TABLE,
     block_kind::WALL as W,
@@ -10,6 +10,7 @@ pub const FIELD_HEIGHT: usize = 20 + 1 + 1;  // フィールド＋底
 pub type Field = [[BlockColor; FIELD_WIDTH]; FIELD_HEIGHT];
 
 // usize型は組み込み整数型の1つであり、ここでは座標を表すために定義。usizeは非負整数を表すのに適している
+#[derive(Clone, Copy)]
 pub struct Position {
     pub x: usize,
     pub y: usize, //ここで位置を定義、他の関数内でこれを用いて編集
@@ -194,4 +195,30 @@ pub fn rotate_left(game: &mut Game) {
     if !is_collision(&game.field, &game.pos, &new_shape) {
         game.block = new_shape;
     }
+}
+
+ // ハードドロップする
+pub fn hard_drop(game: &mut Game) {
+    while {
+        let new_pos = Position {
+            x: game.pos.x,
+            y: game.pos.y + 1,
+        };
+        !is_collision(&game.field, &new_pos, &game.block)
+    }{
+        game.pos.y += 1;
+    }
+    let new_pos = game.pos;
+    move_block(game, new_pos);
+}
+
+ // ブロック落下後の処理
+pub fn landing(game: &mut Game) -> Result<(), ()> {
+    // ブロックをフィールドに固定
+    fix_block(game);
+    // ラインの削除処理
+    erase_line(&mut game.field);
+    // ブロックの生成
+    spawn_block(game)?;
+    Ok(())
 }

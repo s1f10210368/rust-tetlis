@@ -190,6 +190,9 @@ pub fn rotate_right(game: &mut Game) {
     }
     if !is_collision(&game.field, &game.pos, &new_shape) {
         game.block = new_shape;
+    } else if let Ok(new_pos) = super_rotation(&game.field, &game.pos, &new_shape) {
+        game.pos  = new_pos;
+        game.block = new_shape;
     }
 }
 
@@ -203,6 +206,9 @@ pub fn rotate_left(game: &mut Game) {
         }
     }
     if !is_collision(&game.field, &game.pos, &new_shape) {
+        game.block = new_shape;
+    } else if let Ok(new_pos) = super_rotation(&game.field, &game.pos, &new_shape){
+        game.pos = new_pos;
         game.block = new_shape;
     }
 }
@@ -246,4 +252,38 @@ fn ghost_pos(field: &Field, pos: &Position, block: &BlockShape) -> Position {
         ghost_pos.y += 1;
     }
     ghost_pos
+}
+
+ // スーパーローテーション処理
+ // スーパーローテーションできるなら、その座標を返す
+fn super_rotation(field: &Field, pos: &Position, block: &BlockShape) -> Result<Position, ()> {
+    // 1マスずらした座標
+    let diff_pos = [
+        // 上
+        Position {
+            x: pos.x,
+            y: pos.y.checked_sub(1).unwrap_or(pos.y),
+        },
+        // 右
+        Position {
+            x: pos.x + 1,
+            y: pos.y,
+        },
+        // 下
+        Position {
+            x: pos.x,
+            y: pos.y + 1,
+        },
+        // 左
+        Position {
+            x: pos.x.checked_sub(1).unwrap_or(pos.x),
+            y: pos.y,
+        },
+    ];
+    for pos in diff_pos {
+        if !is_collision(field, &pos, block) {
+            return Ok(pos);
+        }
+    }
+    Err(())
 }

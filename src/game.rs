@@ -5,7 +5,7 @@ use crate::block::{
     gen_block_7,
 };
 
-pub const NEXT_LENGTH: usize = 3;
+pub const NEXT_LENGTH: usize = 3; //NEXTとして表示するブロックの個数
 
 pub const SCORE_TABLE: [usize; 5] = [
     0,
